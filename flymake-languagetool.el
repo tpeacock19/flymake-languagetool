@@ -44,7 +44,8 @@
   "Flymake support for LanguageTool."
   :prefix "flymake-languagetool-"
   :group 'flymake
-  :link '(url-link :tag "Github" "https://github.com/emacs-languagetool/flymake-languagetool"))
+  :link '(url-link :tag "Github"
+                   "https://github.com/emacs-languagetool/flymake-languagetool"))
 
 (defcustom flymake-languagetool-active-modes
   '(text-mode latex-mode org-mode markdown-mode message-mode)
@@ -67,21 +68,21 @@ or plan to start a local server some other way."
   :type '(choice (const :tag "Off" nil)
                  (file :tag "Filename" :must-match t))
   :link '(url-link :tag "LanguageTool embedded HTTP Server"
-           "https://dev.languagetool.org/http-server.html")
+                   "https://dev.languagetool.org/http-server.html")
   :group 'flymake-languagetool)
 
 (defcustom flymake-languagetool-server-port 8081
   "The port on which an automatically started LanguageTool server should listen."
   :type 'integer
   :link '(url-link :tag "LanguageTool embedded HTTP Server"
-           "https://dev.languagetool.org/http-server.html")
+                   "https://dev.languagetool.org/http-server.html")
   :group 'flymake-languagetool)
 
 (defcustom flymake-languagetool-server-args ()
   "Extra arguments to pass when starting the LanguageTool server."
   :type '(repeat string)
   :link '(url-link :tag "LanguageTool embedded HTTP Server"
-           "https://dev.languagetool.org/http-server.html")
+                   "https://dev.languagetool.org/http-server.html")
   :group 'flymake-languagetool)
 
 (defcustom flymake-languagetool-language "en-US"
@@ -93,8 +94,8 @@ or plan to start a local server some other way."
 
 (defcustom flymake-languagetool-check-spelling nil
   "If non-nil, LanguageTool will check spelling."
-  :type '(string :tag "Language")
-  :safe #'stringp
+  :type '(boolean :tag "Language")
+  :safe #'booleanp
   :group 'flymake-languagetool)
 
 (defcustom flymake-languagetool-check-params ()
@@ -144,6 +145,9 @@ or plan to start a local server some other way."
   "LanguageTool rules for checking of spelling.
 These rules will be enabled if `flymake-languagetool-check-spelling' is
 non-nil.")
+
+(defvar flymake-languagetool--server-buffer " *LanguageTool server*"
+  "Buffer where languagetool output gets written.")
 
 (defvar-local flymake-languagetool--source-buffer nil
   "Current buffer we are currently using for grammar check.")
@@ -195,7 +199,7 @@ STATUS provided from `url-retrieve'."
     (let ((process
            (apply #'start-process
                   "languagetool-server"
-                  " *LanguageTool server*"
+                  flymake-languagetool--server-buffer
                   "java"
                   "-cp" (expand-file-name flymake-languagetool-server-jar)
                   "org.languagetool.server.HTTPServer"
@@ -214,7 +218,8 @@ STATUS provided from `url-retrieve'."
 (defun flymake-languagetool--start ()
   "Run LanguageTool on the current buffer's contents."
   (when flymake-languagetool-server-jar
-    (unless flymake-languagetool--started-server
+    (unless (and flymake-languagetool--started-server
+                 (process-live-p (get-process "languagetool-server")))
       (setq flymake-languagetool--started-server t)
       (flymake-languagetool--start-server)))
   (let* ((report-fn flymake-languagetool--report-fnc)
@@ -249,12 +254,13 @@ STATUS provided from `url-retrieve'."
 ;;;###autoload
 (defun flymake-languagetool-load ()
   "Convenience function to setup flymake-languagetool.
-This adds the language-tool checker to the list of flymake diagnostic functions."
+This adds the language-tool checker to the list of flymake diagnostic
+functions."
   (add-hook 'flymake-diagnostic-functions #'flymake-languagetool--checker nil t))
 
 ;;;###autoload
 (defun flymake-languagetool-maybe-load ()
-  "Call `flymake-languagetool-load' if this file appears to be check for grammar."
+  "Conditionally load flymake-languagetool flymake diagnostic."
   (interactive)
   (when (memq major-mode flymake-languagetool-active-modes)
     (flymake-languagetool-load)))
