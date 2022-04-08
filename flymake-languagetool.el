@@ -32,6 +32,7 @@
 
 ;;; Code:
 
+(require 'seq)
 (require 'url)
 (require 'json)
 (require 'flymake)
@@ -109,7 +110,7 @@ or plan to start a local server some other way."
 (defvar flymake-languagetool--started-server nil
   "Have we ever attempted to start the LanguageTool server?")
 
-(defvar flymake-languagetool--spelling-rules
+(defcustom flymake-languagetool--spelling-rules
   '("HUNSPELL_RULE"
     "HUNSPELL_RULE_AR"
     "MORFOLOGIK_RULE_AST"
@@ -144,7 +145,17 @@ or plan to start a local server some other way."
     "SYMSPELL_RULE")
   "LanguageTool rules for checking of spelling.
 These rules will be enabled if `flymake-languagetool-check-spelling' is
-non-nil.")
+non-nil."
+  :type '(repeat string)
+  :group 'flymake-languagetool)
+
+(defcustom flymake-languagetool--disabled-rules '()
+  "LanguageTool rules to be disabled. "
+  :type '(repeat string)
+  :group 'flymake-languagetool)
+
+(defvar flymake-languagetool--server-buffer " *LanguageTool server*"
+  "Buffer where languagetool output gets written.")
 
 (defvar flymake-languagetool--server-buffer " *LanguageTool server*"
   "Buffer where languagetool output gets written.")
@@ -232,12 +243,18 @@ STATUS provided from `url-retrieve'."
          (url-request-extra-headers
           '(("Content-Type" . "application/x-www-form-urlencoded")))
          (source-buffer (current-buffer))
+         (disabled (string-join (seq-union
+                                 flymake-languagetool--disabled-rules
+                                 (unless flymake-languagetool-check-spelling
+                                   flymake-languagetool--spelling-rules))
+                                ","))
          (params (list
-                  (list "text" (with-current-buffer source-buffer (buffer-string)))
+                  (list "text" (with-current-buffer source-buffer
+                                 (buffer-substring-no-properties (point-min) (point-max))))
                   (list "language" flymake-languagetool-language)
-                  (unless flymake-languagetool-check-spelling
-                    (list "disabledRules" (string-join flymake-languagetool--spelling-rules
-                                                       ",")))))
+                  (unless (string-empty-p disabled)
+                    (list "disabledRules"
+                          disabled))))
          (url-request-data (url-build-query-string params)))
     (url-retrieve
      (concat (or flymake-languagetool-url
